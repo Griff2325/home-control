@@ -9,7 +9,7 @@ export class ConfigError extends Error {}
 export const LIGHT_KINDS = LIGHT_TYPES;
 
 // A lamp or an AC is real when it is linked to a device of a connected platform:
-// `link: { service, id }` (Home Assistant, Philips Hue, Apple Home) or, for Smart Life,
+// `link: { service, id }` (Home Assistant, Philips Hue, Govee, Apple Home) or, for Smart Life,
 // `tuya: { deviceId }`. An AC's `sensor: { service, id }` is a thermometer for its room.
 export const LINK_FIELDS = ['tuya', 'link', 'sensor'];
 
@@ -26,6 +26,7 @@ export const SERVICES = {
   smartlife: { name: 'Smart Life', short: 'Smart Life' },
   homeassistant: { name: 'Home Assistant', short: 'Home Assistant' },
   hue: { name: 'Philips Hue', short: 'Hue' },
+  govee: { name: 'Govee', short: 'Govee' },
   homekit: { name: 'Apple Home', short: 'Apple Home' },
 };
 export const FLOOR_KINDS = ['oak', 'walnut', 'tile', 'stone'];

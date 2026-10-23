@@ -420,6 +420,7 @@ enum ConnectionLook {
     static let smartLife = Color(red: 1, green: 0.48, blue: 0.24)
     static let homeAssistant = Color(red: 0.09, green: 0.74, blue: 0.95)
     static let hue = Color(red: 0.76, green: 0.55, blue: 1)
+    static let govee = Color(red: 0.2, green: 0.85, blue: 0.62)
     static let homeKit = Color(red: 1, green: 0.7, blue: 0.25)
 
     static func tint(_ service: String) -> Color {
@@ -427,6 +428,7 @@ enum ConnectionLook {
         case "smartlife": smartLife
         case "homeassistant": homeAssistant
         case "hue": hue
+        case "govee": govee
         default: homeKit
         }
     }
@@ -436,6 +438,7 @@ enum ConnectionLook {
         case "smartlife": "powerplug.fill"
         case "homeassistant": "server.rack"
         case "hue": "lightbulb.led.fill"
+        case "govee": "light.strip.2.fill"
         default: "homekit"
         }
     }
@@ -445,6 +448,7 @@ enum ConnectionLook {
         case "smartlife": "Smart Life"
         case "homeassistant": "Home Assistant"
         case "hue": "Philips Hue"
+        case "govee": "Govee"
         default: "Apple Home"
         }
     }

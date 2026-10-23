@@ -1,7 +1,7 @@
 import Foundation
 
 /// Everything between the UI and the real devices, shared by the Mac and the iPhone app:
-/// which platforms are connected (Smart Life, Home Assistant, Philips Hue, Apple Home),
+/// which platforms are connected (Smart Life, Home Assistant, Philips Hue, Govee, Apple Home),
 /// which device of the plan is linked to which real device, sending the changes made in
 /// the panel and reading the devices' state back.
 @MainActor
@@ -11,10 +11,11 @@ public final class DeviceHub {
     public let cloud: LinkedCloud?
     public let homeAssistant: HomeAssistantService
     public let hue: HueService
+    public let govee: GoveeService
     /// Apple Home: HomeKit itself on the iPhone, the iPhone's catalog on the Mac.
     public let homeKit: DeviceService
     /// The platforms other than Smart Life, by the id a plan's `link.service` uses.
-    public var services: [DeviceService] { [homeAssistant, hue, homeKit] }
+    public var services: [DeviceService] { [homeAssistant, hue, govee, homeKit] }
     private func service(_ id: String) -> DeviceService? { services.first { $0.id == id } }
     /// Smart Life when it is part of this build and signed in.
     private var connectedCloud: LinkedCloud? { cloud?.isConnected == true ? cloud : nil }
@@ -51,6 +52,7 @@ public final class DeviceHub {
         self.cloud = cloud?(directory, vault)
         homeAssistant = HomeAssistantService(vault: vault("homeassistant"))
         hue = HueService(vault: vault("hue"))
+        govee = GoveeService(vault: vault("govee"))
         self.homeKit = homeKit ?? RemoteCatalogService(id: "homekit", title: "Apple Home",
                                                        file: directory.appendingPathComponent("homekit-devices.json"))
         for service in services {
@@ -278,7 +280,7 @@ public final class DeviceHub {
 
     /// The platforms whose connection travels between paired devices. (Apple Home is the
     /// phone's own; a Smart Life session cannot be shared, Tuya rotates its tokens.)
-    public static let shareablePlatforms = ["homeassistant", "hue"]
+    public static let shareablePlatforms = ["homeassistant", "hue", "govee"]
 
     /// When each shareable platform was last connected or disconnected on this device, or
     /// adopted from another one: the newer side wins when two devices disagree.
@@ -293,7 +295,12 @@ public final class DeviceHub {
     private let stampsURL: URL
 
     private func shareable(_ id: String) -> [String: Any]? {
-        id == "homeassistant" ? homeAssistant.shareable : id == "hue" ? hue.shareable : nil
+        switch id {
+        case "homeassistant": return homeAssistant.shareable
+        case "hue": return hue.shareable
+        case "govee": return govee.shareable
+        default: return nil
+        }
     }
 
     /// Connects Home Assistant (checking the address and token first) and remembers when.
@@ -306,6 +313,12 @@ public final class DeviceHub {
     public func pairHue(host: String, bridgeId: String?, name: String?) async throws {
         try await hue.pair(host: host, bridgeId: bridgeId, name: name)
         stamp("hue")
+    }
+
+    /// Turns Govee on: lights on this Wi-Fi, and those of the account behind `apiKey`.
+    public func connectGovee(lan: Bool, apiKey: String?, hosts: [String]) async throws {
+        try await govee.connect(lan: lan, apiKey: apiKey, hosts: hosts)
+        stamp("govee")
     }
 
     /// Disconnects a platform; for Home Assistant and Hue the paired devices follow.
@@ -356,6 +369,8 @@ public final class DeviceHub {
                 services.first { $0.id == id }?.disconnect()
             } else if id == "homeassistant" {
                 homeAssistant.adopt(incoming)
+            } else if id == "govee" {
+                govee.adopt(incoming)
             } else {
                 hue.adopt(incoming)
             }

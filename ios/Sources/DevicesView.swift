@@ -129,7 +129,7 @@ struct DevicesView: View {
                 IconBadge(symbol: "link", tint: Theme.warm)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Nothing connected yet").font(.system(size: 16.5, weight: .semibold)).foregroundStyle(Theme.text)
-                    Text("Connect Smart Life, Home Assistant, Philips Hue or Apple Home in Settings first; their devices then appear here to choose from.")
+                    Text("Connect Smart Life, Home Assistant, Philips Hue, Govee or Apple Home in Settings first; their devices then appear here to choose from.")
                         .font(.system(size: 14)).foregroundStyle(Theme.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -225,7 +225,7 @@ struct DevicePicker: View {
                 Section {
                     option(nil, name: kind == "sensor" ? "None — estimated" : "Not linked — simulated", detail: nil, symbol: "circle.dashed")
                 }
-                ForEach(["smartlife", "homeassistant", "hue", "homekit"], id: \.self) { service in
+                ForEach(["smartlife", "homeassistant", "hue", "govee", "homekit"], id: \.self) { service in
                     let list = candidates.filter { $0.service == service }
                     if !list.isEmpty {
                         Section(ConnectionLook.title(service)) {

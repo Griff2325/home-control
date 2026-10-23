@@ -50,6 +50,7 @@ struct SettingsView: View {
                 case .quickActions: QuickActionsView()
                 case .homeAssistant: HomeAssistantView()
                 case .hue: HueView()
+                case .govee: GoveeView()
                 case .devices: DevicesView()
                 }
             }
@@ -335,6 +336,12 @@ struct SettingsView: View {
                 NavigationLink(value: SettingsRoute.hue) {
                     serviceRow(symbol: "lightbulb.led.fill", tint: ConnectionLook.hue, title: "Philips Hue",
                                detail: model.hueName ?? "Pair your Hue Bridge", on: model.hueName != nil)
+                }
+                .buttonStyle(RowButtonStyle())
+                RowDivider()
+                NavigationLink(value: SettingsRoute.govee) {
+                    serviceRow(symbol: ConnectionLook.symbol("govee"), tint: ConnectionLook.govee, title: "Govee",
+                               detail: model.goveeName ?? "Lights on this Wi-Fi, no account", on: model.goveeName != nil)
                 }
                 .buttonStyle(RowButtonStyle())
                 RowDivider()
