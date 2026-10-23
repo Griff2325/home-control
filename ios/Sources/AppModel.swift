@@ -27,6 +27,7 @@ enum SettingsRoute: Hashable, Identifiable {
     case quickActions
     case homeAssistant
     case hue
+    case govee
     case devices
 
     var id: Self { self }
@@ -37,6 +38,7 @@ enum SettingsRoute: Hashable, Identifiable {
         case "smartlife" where AppModel.includesSmartLife: self = .smartLife
         case "homeassistant": self = .homeAssistant
         case "hue": self = .hue
+        case "govee": self = .govee
         default: return nil
         }
     }
@@ -90,6 +92,8 @@ final class AppModel {
     // Home Assistant and Hue (shared by the Mac), Apple Home (this phone's own)
     private(set) var homeAssistantName: String?
     private(set) var hueName: String?
+    /// "Govee · 3 lights" once Govee is on.
+    private(set) var goveeName: String?
     private(set) var homeKit: HomeKitStatus = .off
     @ObservationIgnored let homeKitService = HomeKitService()
 
@@ -192,6 +196,7 @@ final class AppModel {
         case "quickactions": showSettings = true; settingsPath = [.quickActions]
         case "homeassistant": showSettings = true; settingsPath = [.homeAssistant]
         case "hue": showSettings = true; settingsPath = [.hue]
+        case "govee": showSettings = true; settingsPath = [.govee]
         case "devices": showSettings = true; settingsPath = [.devices]
         case "editor": showEditor = true; openEditor()
         case "connections": showSettings = true
@@ -497,6 +502,16 @@ final class AppModel {
                     reply(["error": error.localizedDescription])
                 }
             }
+        case "govee.connect":
+            Task { @MainActor in
+                do {
+                    try await connectGovee(lan: message["lan"] as? Bool ?? true, apiKey: message["apiKey"] as? String,
+                                           hosts: message["hosts"] as? [String] ?? [])
+                    reply(hub.servicesInfo)
+                } catch {
+                    reply(["error": error.localizedDescription])
+                }
+            }
         case "service.disconnect":
             disconnect(service: message["service"] as? String ?? "")
             reply(hub.servicesInfo)
@@ -789,6 +804,20 @@ final class AppModel {
         return true
     }
 
+    /// Turns Govee on (or changes its settings): lights on this Wi-Fi and/or an API key.
+    func connectGovee(lan: Bool, apiKey: String?, hosts: [String]) async throws {
+        try await hub.connectGovee(lan: lan, apiKey: apiKey, hosts: hosts)
+        connectionsChanged()
+        Haptics.shared.play("success")
+    }
+
+    /// Scans for Govee lights again and returns them.
+    func goveeLights() async throws -> [ServiceDevice] {
+        let lights = try await hub.govee.devices()
+        refreshConnections()
+        return lights
+    }
+
     func disconnect(service: String) {
         hub.disconnect(service: service)
         connectionsChanged()
@@ -809,15 +838,23 @@ final class AppModel {
     /// True when at least one platform's devices can be linked.
     var hasAnyConnection: Bool {
         if case .ready = homeKit { return true }
-        return smartLifeConnected || homeAssistantName != nil || hueName != nil
+        return smartLifeConnected || homeAssistantName != nil || hueName != nil || goveeName != nil
     }
     var hueInfo: [String: Any] { hub.hue.info }
+    var goveeInfo: [String: Any] { hub.govee.info }
 
     private func refreshConnections() {
         let ha = hub.homeAssistant.info
         homeAssistantName = ha["connected"] as? Bool == true ? (ha["name"] as? String ?? "Home Assistant") : nil
         let hue = hub.hue.info
         hueName = hue["connected"] as? Bool == true ? (hue["name"] as? String ?? "Hue Bridge") : nil
+        let govee = hub.govee.info
+        if govee["connected"] as? Bool == true {
+            let count = govee["lights"] as? Int ?? 0
+            goveeName = count == 0 ? "Govee · no lights yet" : "Govee · \(count) light\(count == 1 ? "" : "s")"
+        } else {
+            goveeName = nil
+        }
         let info = homeKitService.info
         if !homeKitService.isEnabled {
             homeKit = .off

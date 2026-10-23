@@ -243,7 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let section = editorSection { boot["section"] = section }
         switch ProcessInfo.processInfo.environment["HOUSE_OPEN_EDITOR"] {
         case "smartlife": boot["section"] = "service:smartlife"
-        case "homeassistant", "hue", "homekit", "connections":
+        case "homeassistant", "hue", "govee", "homekit", "connections":
             let section = ProcessInfo.processInfo.environment["HOUSE_OPEN_EDITOR"]!
             boot["section"] = section == "connections" ? "connections" : "service:\(section)"
         default: break
@@ -509,6 +509,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     host.reply(to: message, hub.servicesInfo)
                 } catch is HueService.ButtonNotPressed {
                     host.reply(to: message, ["waiting": true])
+                } catch {
+                    host.reply(to: message, ["error": error.localizedDescription])
+                }
+            }
+        case "govee.connect":
+            Task { @MainActor in
+                do {
+                    try await hub.connectGovee(lan: message["lan"] as? Bool ?? true, apiKey: message["apiKey"] as? String,
+                                               hosts: message["hosts"] as? [String] ?? [])
+                    connectionsChanged()
+                    host.reply(to: message, hub.servicesInfo)
                 } catch {
                     host.reply(to: message, ["error": error.localizedDescription])
                 }
@@ -805,6 +816,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                   connected: connected("homeassistant")),
             .init(id: "hue", name: "Philips Hue", symbol: "lightbulb.2.fill", tint: .indigo,
                   detail: connected("hue") ? entry("hue")["name"] as? String ?? "Connected" : "Not paired", connected: connected("hue")),
+            .init(id: "govee", name: "Govee", symbol: "light.strip.2.fill", tint: .mint,
+                  detail: connected("govee") ? "\(entry("govee")["lights"] as? Int ?? 0) lights" : "Not connected", connected: connected("govee")),
             .init(id: "homekit", name: "Apple Home", symbol: "homekit", tint: .yellow,
                   detail: connected("homekit")
                     ? "\(homeKit["count"] as? Int ?? 0) devices, from \(homeKit["from"] as? String ?? "your iPhone")"

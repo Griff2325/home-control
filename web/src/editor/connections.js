@@ -1,16 +1,17 @@
 // The editor's "Connections": the smart home platforms House Control can link the plan's
-// lamps and ACs to (Smart Life, Home Assistant, Philips Hue, Apple Home), the screens that
+// lamps and ACs to (Smart Life, Home Assistant, Philips Hue, Govee, Apple Home), the screens that
 // connect each one, and the pickers that link a lamp or an AC to one of their devices.
 import { h } from '../ui/dom.js';
 import { icon } from '../ui/icons.js';
 import { isNative, call } from '../bridge.js';
 import { SERVICES, linkOf } from '../config.js';
 
-const ORDER = ['smartlife', 'homeassistant', 'hue', 'homekit'];
+const ORDER = ['smartlife', 'homeassistant', 'hue', 'govee', 'homekit'];
 const LOOK = {
   smartlife: { icon: 'plug', tint: '#ff7a3d', blurb: 'Tuya, Smart Life and the many brands built on them' },
   homeassistant: { icon: 'homeassistant', tint: '#18bcf2', blurb: 'Everything it runs: Zigbee, Matter, Nest, Xiaomi, Sonoff…' },
   hue: { icon: 'bulb', tint: '#c38bff', blurb: 'A Hue Bridge on this network. No account needed' },
+  govee: { icon: 'strip', tint: '#33d99e', blurb: 'Govee lights on this network, or through your Govee API key' },
   homekit: { icon: 'home', tint: '#ffb340', blurb: 'HomeKit and Matter accessories, through your iPhone' },
 };
 const KIND_TITLES = { light: 'Lights and plugs', ac: 'Air conditioners', sensor: 'Temperature sensors' };
@@ -80,7 +81,7 @@ export function createConnections({ rerender, toast, usedBy, onOpen }) {
     }
     if (!info.connected) return 'Not connected';
     const count = devicesOf(id).length;
-    const name = id === 'homeassistant' ? info.name : id === 'hue' ? info.name : id === 'smartlife' ? info.account : '';
+    const name = id === 'homeassistant' || id === 'hue' ? info.name : id === 'smartlife' ? info.account : '';
     return [name, state.devices ? `${count} device${count === 1 ? '' : 's'}` : null].filter(Boolean).join(' · ') || 'Connected';
   }
 
@@ -269,6 +270,61 @@ export function createConnections({ rerender, toast, usedBy, onOpen }) {
     ];
   }
 
+  /* ---------- Govee ---------- */
+
+  const gv = { lan: true, apiKey: '', hosts: '', error: null, busy: false, editing: false };
+
+  function govee() {
+    const info = state.info.govee || {};
+    if (info.connected && !gv.editing) {
+      if (!state.devices && !state.loading) setTimeout(() => load(), 0);
+      const how = [info.lan ? 'This network' : null, info.cloud ? 'Govee API key' : null].filter(Boolean).join(' + ');
+      return [
+        connectedHeader('govee', 'Govee', 'Govee', how),
+        h('button.btn.link', { onclick: () => { gv.editing = true; gv.lan = info.lan !== false; gv.hosts = (info.hosts || []).join(', '); rerender(); } }, 'Change settings'),
+        deviceList('govee'),
+      ];
+    }
+    const lan = h('input', { type: 'checkbox', checked: gv.lan });
+    const key = h('input', { type: 'password', autocomplete: 'off', placeholder: 'Optional', value: gv.apiKey });
+    const hosts = h('input', { type: 'text', spellcheck: 'false', placeholder: 'e.g. 192.168.1.40, 192.168.1.41', value: gv.hosts });
+    const ready = () => isNative && !gv.busy && (gv.lan || gv.apiKey.trim());
+    lan.addEventListener('change', () => { gv.lan = lan.checked; button.disabled = !ready(); });
+    key.addEventListener('input', () => { gv.apiKey = key.value; button.disabled = !ready(); });
+    hosts.addEventListener('input', () => { gv.hosts = hosts.value; });
+    const connect = async () => {
+      gv.busy = true; gv.error = null; rerender();
+      try {
+        state.info = await call('govee.connect', {
+          lan: gv.lan, apiKey: gv.apiKey.trim(), hosts: gv.hosts.split(/[\s,]+/).filter(Boolean),
+        });
+        gv.apiKey = '';
+        gv.editing = false;
+        toast('Govee connected');
+        await load();
+      } catch (e) { gv.error = e.message; }
+      gv.busy = false;
+      rerender();
+    };
+    const button = h('button.btn.primary.wide', { onclick: connect, disabled: !ready() }, gv.busy ? 'Looking for lights…' : 'Connect');
+    return [
+      section('On this network',
+        h('div.checks', h('label.field', h('span', 'Find Govee lights on this Wi-Fi (no account)'), lan)),
+        h('ol.steps',
+          h('li', 'In the Govee app, open each light and tap the gear for its settings.'),
+          h('li', 'Switch on LAN Control. Lights without that switch need the API key below.'))),
+      section('Govee API key',
+        h('label.field', h('span', 'API key'), key),
+        h('p.note', 'Govee app → Profile → Settings → Apply for API Key; Govee emails it to you. Leave it empty to stay local only.')),
+      section('Addresses',
+        h('label.field', h('span', 'Light IP addresses'), hosts),
+        h('p.note', 'Only for lights that are not found by themselves.')),
+      button,
+      gv.editing ? h('button.btn.wide', { onclick: () => { gv.editing = false; rerender(); } }, 'Cancel') : null,
+      gv.error ? h('p.note.bad', gv.error) : null,
+    ];
+  }
+
   /* ---------- Apple Home ---------- */
 
   function homeKit() {
@@ -297,6 +353,7 @@ export function createConnections({ rerender, toast, usedBy, onOpen }) {
     if (id === 'smartlife') return smartLifePanel();
     if (id === 'homeassistant') return homeAssistant();
     if (id === 'hue') return hue();
+    if (id === 'govee') return govee();
     return homeKit();
   }
 
@@ -335,7 +392,7 @@ export function createConnections({ rerender, toast, usedBy, onOpen }) {
     const current = link ? `${link.service}|${link.id}` : '';
     if (!anyConnected()) {
       return section('Real device',
-        h('p.note', 'Simulated. Connect Smart Life, Home Assistant, Philips Hue or Apple Home to control the real one.'),
+        h('p.note', 'Simulated. Connect Smart Life, Home Assistant, Philips Hue, Govee or Apple Home to control the real one.'),
         h('button.btn.wide', { onclick: () => onOpen(null) }, icon('link', 14), 'Open Connections'));
     }
     if (!state.devices && !state.loading) setTimeout(() => load({ quiet: true }), 0);

@@ -23,6 +23,7 @@ struct EditorScreen: View {
                     #endif
                     case .homeAssistant: HomeAssistantView()
                     case .hue: HueView()
+                    case .govee: GoveeView()
                     default: EmptyView()
                     }
                 }
