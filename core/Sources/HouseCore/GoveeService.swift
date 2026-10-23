@@ -25,6 +25,11 @@ public final class GoveeService: DeviceService {
         var name: String?
         var ip: String?
         var cloud = false
+        /// The cloud's device type ("devices.types.light", "devices.types.socket"…).
+        var type: String?
+
+        /// A smart plug: only on and off.
+        var isPlug: Bool { type?.contains("socket") == true }
     }
 
     private let vault: SecretStore
@@ -122,6 +127,7 @@ public final class GoveeService: DeviceService {
                     known.sku = device.sku
                     known.name = device.name
                     known.cloud = true
+                    known.type = device.type
                     next.known[device.id] = known
                 }
             } catch {
@@ -136,9 +142,9 @@ public final class GoveeService: DeviceService {
 
         return next.known.map { id, known in
             var device = ServiceDevice(id: id, name: known.name ?? "Govee \(known.sku)", kind: .light)
-            device.capabilities = ["brightness", "temp", "color"]
+            device.capabilities = known.isPlug ? [] : ["brightness", "temp", "color"]
             let route = known.ip != nil ? "Wi-Fi \(known.ip ?? "")" : known.cloud ? "Govee cloud" : "not found"
-            device.detail = "\(known.sku) · \(route)"
+            device.detail = "\(known.sku)\(known.isPlug ? " plug" : "") · \(route)"
             device.online = known.ip != nil || known.cloud
             return device
         }.sorted { $0.name < $1.name }
@@ -177,7 +183,8 @@ public final class GoveeService: DeviceService {
         guard kind == .light else { throw ServiceFailure("Govee has no air conditioners here") }
         guard let config, let known = config.known[id] else { throw ServiceFailure("This Govee light is not known any more. Look for lights again.") }
         let patch = DeviceKind.withPower(raw, state: state)
-        let commands = Self.commands(patch)
+        var commands = Self.commands(patch)
+        if known.isPlug { commands = commands.filter { if case .power = $0 { return true } else { return false } } }
         guard !commands.isEmpty else { return }
 
         if config.lan, let ip = known.ip {
@@ -248,6 +255,7 @@ public final class GoveeService: DeviceService {
         var id: String
         var sku: String
         var name: String?
+        var type: String?
     }
 
     private func cloudDevices(key: String) async throws -> [CloudDevice] {
@@ -255,9 +263,11 @@ public final class GoveeService: DeviceService {
         let list = json["data"] as? [[String: Any]] ?? []
         return list.compactMap { item in
             guard let id = item["device"] as? String, let sku = item["sku"] as? String else { return nil }
-            // Lights only: plugs, sensors and kettles live in the same account.
-            if let type = item["type"] as? String, !type.contains("light") { return nil }
-            return CloudDevice(id: id.uppercased(), sku: sku, name: item["deviceName"] as? String)
+            // Lights and plugs (a lamp on a plug is a light that only switches); sensors,
+            // kettles and humidifiers live in the same account and are left out.
+            let type = item["type"] as? String
+            if let type, !type.contains("light"), !type.contains("socket") { return nil }
+            return CloudDevice(id: id.uppercased(), sku: sku, name: item["deviceName"] as? String, type: type)
         }
     }
 
