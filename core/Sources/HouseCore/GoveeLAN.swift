@@ -6,7 +6,7 @@ import Darwin
 /// The Govee LAN API: JSON over UDP on the local network, no cloud and no account.
 ///
 /// - Scans go to port 4001: the multicast group 239.255.255.250, and also every host of the
-///   local /24, because an iPhone app may only send multicast with a special entitlement.
+///   local subnet (up to a /22), because an iPhone app may only send multicast with a special entitlement.
 /// - Lights answer on port 4002, where this listens.
 /// - Commands and status requests go to the light's port 4003.
 ///
@@ -259,11 +259,12 @@ final class GoveeLAN: @unchecked Sendable {
         return nil
     }
 
-    /// Every other host of the subnet, at most the /24 around this device.
+    /// Every other host of the subnet, at most the /22 around this device (home routers
+    /// such as eero hand out /22s).
     static func subnetHosts(ip: in_addr, mask: in_addr) -> [String] {
         let address = UInt32(bigEndian: ip.s_addr)
         var netmask = UInt32(bigEndian: mask.s_addr)
-        if netmask.nonzeroBitCount < 24 { netmask = 0xFFFF_FF00 }
+        if netmask.nonzeroBitCount < 22 { netmask = 0xFFFF_FC00 }
         let network = address & netmask
         let hosts = ~netmask
         guard hosts > 1, hosts <= 1024 else { return [] }

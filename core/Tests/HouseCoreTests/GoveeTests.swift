@@ -43,15 +43,36 @@ final class GoveeTests: XCTestCase {
         XCTAssertEqual(GoveeService.commands([:]), [])
     }
 
-    func testSubnetSweepStaysWithinASlash24() {
+    func testSubnetSweepCoversASlash22() {
+        var ip = in_addr(), mask = in_addr()
+        inet_pton(AF_INET, "192.168.5.37", &ip)
+        inet_pton(AF_INET, "255.255.252.0", &mask)
+        let hosts = GoveeLAN.subnetHosts(ip: ip, mask: mask)
+        XCTAssertEqual(hosts.count, 1021)
+        XCTAssertEqual(hosts.first, "192.168.4.1")
+        XCTAssertEqual(hosts.last, "192.168.7.254")
+        XCTAssertTrue(hosts.contains("192.168.6.20"))
+        XCTAssertFalse(hosts.contains("192.168.5.37"))
+    }
+
+    func testSubnetSweepStaysWithinASlash22OnBiggerNetworks() {
+        var ip = in_addr(), mask = in_addr()
+        inet_pton(AF_INET, "10.0.9.5", &ip)
+        inet_pton(AF_INET, "255.255.0.0", &mask)
+        let hosts = GoveeLAN.subnetHosts(ip: ip, mask: mask)
+        XCTAssertEqual(hosts.count, 1021)
+        XCTAssertEqual(hosts.first, "10.0.8.1")
+        XCTAssertEqual(hosts.last, "10.0.11.254")
+    }
+
+    func testSubnetSweepOfASlash24() {
         var ip = in_addr(), mask = in_addr()
         inet_pton(AF_INET, "192.168.1.37", &ip)
-        inet_pton(AF_INET, "255.255.0.0", &mask)
+        inet_pton(AF_INET, "255.255.255.0", &mask)
         let hosts = GoveeLAN.subnetHosts(ip: ip, mask: mask)
         XCTAssertEqual(hosts.count, 253)
         XCTAssertEqual(hosts.first, "192.168.1.1")
         XCTAssertEqual(hosts.last, "192.168.1.254")
-        XCTAssertFalse(hosts.contains("192.168.1.37"))
     }
 
     func testStartsDisconnectedAndForgetsOnDisconnect() async throws {
