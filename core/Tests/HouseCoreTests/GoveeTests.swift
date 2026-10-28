@@ -45,14 +45,14 @@ final class GoveeTests: XCTestCase {
 
     func testSubnetSweepCoversASlash22() {
         var ip = in_addr(), mask = in_addr()
-        inet_pton(AF_INET, "192.168.5.37", &ip)
+        inet_pton(AF_INET, "172.16.5.37", &ip)
         inet_pton(AF_INET, "255.255.252.0", &mask)
         let hosts = GoveeLAN.subnetHosts(ip: ip, mask: mask)
         XCTAssertEqual(hosts.count, 1021)
-        XCTAssertEqual(hosts.first, "192.168.4.1")
-        XCTAssertEqual(hosts.last, "192.168.7.254")
-        XCTAssertTrue(hosts.contains("192.168.6.20"))
-        XCTAssertFalse(hosts.contains("192.168.5.37"))
+        XCTAssertEqual(hosts.first, "172.16.4.1")
+        XCTAssertEqual(hosts.last, "172.16.7.254")
+        XCTAssertTrue(hosts.contains("172.16.6.20"))
+        XCTAssertFalse(hosts.contains("172.16.5.37"))
     }
 
     func testSubnetSweepStaysWithinASlash22OnBiggerNetworks() {
